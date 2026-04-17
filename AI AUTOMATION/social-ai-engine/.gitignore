@@ -1,0 +1,24 @@
+# Secret keys - never upload these
+.env
+
+# Python junk files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment folder
+venv/
+env/
+
+# Google Sheets credentials - keep this secret too
+credentials.json
+
+# VS Code settings (optional, up to you)
+.vscode/
+
+# Windows system files
+Thumbs.db
+desktop.ini
+
+# Mac system files (just in case)
+.DS_Store

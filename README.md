@@ -35,10 +35,10 @@ Welcome to my project repository! This is a collection of my work focusing on **
 
 ## 👨‍💻 About Me
 
-I am **Ace C. Nera**, a 4th-year **Information Technology** student specializing in **Data Science**. I am passionate about building efficient web applications and automating repetitive tasks using AI tools. 
+I am **Ace C. Nera**, a **Information Technology** graduate specializing in **Data Science**. I am passionate about building efficient web applications and automating repetitive tasks using AI tools. 
 
 * 📍 Manila, Philippines
-* 💼 Seeking: Web Development / QA Internships
+* 💼 Seeking: Web Development / QA / Data Analyst / Graphic Design
 * 📫 Reach me at: Acecamangyan03@gmail.com
 
 ---

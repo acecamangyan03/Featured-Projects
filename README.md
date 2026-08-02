@@ -9,7 +9,8 @@ Welcome to my project repository! This is a collection of my work focusing on **
 | Project Name | Description | Tech Stack | Status |
 | :--- | :--- | :--- | :--- |
 | **[Social AI Engine](./AI%20AUTOMATION/social-ai-engine)** | An automation tool for generating and scheduling social media content. | React, n8n, JavaScript | 🟢 Completed |
-
+| **[Virtual Store & Editor](./your-folder-path-here)** | An innovative online shopping experience using interactive, real-world store panoramas (inspired by Google Street View), complete with a custom store editor. | Next.js, React, JavaScript, Firebase, Marzipano | 🟡 Completed (Local only) |
+| **[E-commerce Chatbot](./your-folder-path-here)** | A simple, interactive chatbot powered by the Gemini API, designed for a Japanese convenience store. | React, Next.js, JavaScript, Firebase, Gemini API | 🟢 Completed |
 
 ---
 

@@ -1,0 +1,231 @@
+{
+  "name": "Telegram Receipt Photo Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "tg-trigger-1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [-1120, 800]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg1",
+              "name": "driveRootFolderId",
+              "type": "string",
+              "value": "YOUR_DRIVE_ROOT_FOLDER_ID"
+            },
+            {
+              "id": "cfg2",
+              "name": "sheetDocumentId",
+              "type": "string",
+              "value": "YOUR_GOOGLE_SHEET_ID"
+            },
+            {
+              "id": "cfg3",
+              "name": "sheetName",
+              "type": "string",
+              "value": "Receipts"
+            },
+            {
+              "id": "cfg4",
+              "name": "geminiModel",
+              "type": "string",
+              "value": "models/gemini-2.0-flash"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1120, 1000],
+      "notes": "Fill in driveRootFolderId (a Drive folder to hold date-subfolders) and sheetDocumentId before running."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 1 },
+          "conditions": [
+            {
+              "id": "hasphoto1",
+              "leftValue": "={{ $json.message.photo }}",
+              "rightValue": "",
+              "operator": { "type": "array", "operation": "exists", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-photo",
+      "name": "Has Photo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-880, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Telegram sends an array of the same photo in multiple resolutions.\n// The last element is always the largest/highest quality.\nconst msg = $input.item.json.message;\nconst photos = msg.photo || [];\nconst largest = photos[photos.length - 1];\n\nreturn [{\n  json: {\n    fileId: largest.file_id,\n    chatId: msg.chat.id,\n    messageId: msg.message_id\n  }\n}];"
+      },
+      "id": "code-get-file-id",
+      "name": "Get Largest Photo ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-656, 704]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}",
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "id": "tg-get-file",
+      "name": "Telegram Get File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-432, 704]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": "={{ $('Config').first().json.geminiModel }}",
+        "prompt": "Analyze this receipt image and extract the following key details: Merchant Name, Total Amount, and Date of Transaction. Output ONLY strict JSON with exactly these three keys: merchantName, totalAmount, date. No markdown, no explanation, no code fences.",
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "id": "gemini-analyze",
+      "name": "Analyze Receipt (Gemini)",
+      "type": "n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [-208, 704]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json;\n\n// Different n8n/Gemini node versions expose the reply under different keys.\nlet text = raw.content || raw.text || raw.output || raw.data || raw.response || '';\nif (typeof text !== 'string') text = JSON.stringify(text);\n\n// Strip markdown code fences in case Gemini wrapped the JSON anyway.\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { merchantName: 'PARSE_ERROR', totalAmount: '', date: '', rawResponse: cleaned };\n}\n\nconst now = new Date();\nconst submissionDate = now.toISOString().slice(0, 10);\nconst msg = $('Telegram Trigger').item.json.message;\n\nreturn [{\n  json: {\n    merchantName: parsed.merchantName || parsed['Merchant Name'] || parsed.merchant || 'Unknown',\n    totalAmount: parsed.totalAmount || parsed['Total Amount'] || parsed.amount || '',\n    transactionDate: parsed.date || parsed['Date of Transaction'] || parsed.transactionDate || '',\n    submissionDate,\n    fileName: `receipt_${submissionDate}_${msg.message_id}.jpg`,\n    chatId: msg.chat.id\n  },\n  binary: $('Telegram Get File').item.binary\n}];"
+      },
+      "id": "code-parse-receipt",
+      "name": "Parse Receipt Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [16, 704]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SUB_WORKFLOW_ID",
+          "mode": "list",
+          "cachedResultName": "SUB - Get or Create Drive Folder"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "parentFolderId": "={{ $('Config').first().json.driveRootFolderId }}",
+            "folderName": "={{ $json.submissionDate }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "parentFolderId", "displayName": "parentFolderId", "type": "string" },
+            { "id": "folderName", "displayName": "folderName", "type": "string" }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "exec-date-folder",
+      "name": "Get/Create Date Folder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [240, 704]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "={{ $('Config').first().json.sheetDocumentId }}"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "={{ $('Config').first().json.sheetName }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Merchant Name": "={{ $('Parse Receipt Data').item.json.merchantName }}",
+            "Total Amount": "={{ $('Parse Receipt Data').item.json.totalAmount }}",
+            "Transaction Date": "={{ $('Parse Receipt Data').item.json.transactionDate }}",
+            "Submission Date": "={{ $('Parse Receipt Data').item.json.submissionDate }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append",
+      "name": "Log to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [464, 704]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Parse Receipt Data').item.json.fileName }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "mode": "id", "value": "={{ $json.folderId }}" },
+        "options": {}
+      },
+      "id": "drive-upload",
+      "name": "Upload Receipt to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [688, 592]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse Receipt Data').item.json.chatId }}",
+        "text": "=Receipt logged ✅\nMerchant: {{ $('Parse Receipt Data').item.json.merchantName }}\nAmount: {{ $('Parse Receipt Data').item.json.totalAmount }}\nDate: {{ $('Parse Receipt Data').item.json.transactionDate }}",
+        "additionalFields": {}
+      },
+      "id": "tg-confirm",
+      "name": "Send Confirmation (optional)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [688, 816]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Has Photo?", "type": "main", "index": 0 }]] },
+    "Config": { "main": [[]] },
+    "Has Photo?": { "main": [[{ "node": "Get Largest Photo ID", "type": "main", "index": 0 }], []] },
+    "Get Largest Photo ID": { "main": [[{ "node": "Telegram Get File", "type": "main", "index": 0 }]] },
+    "Telegram Get File": { "main": [[{ "node": "Analyze Receipt (Gemini)", "type": "main", "index": 0 }]] },
+    "Analyze Receipt (Gemini)": { "main": [[{ "node": "Parse Receipt Data", "type": "main", "index": 0 }]] },
+    "Parse Receipt Data": { "main": [[{ "node": "Get/Create Date Folder", "type": "main", "index": 0 }]] },
+    "Get/Create Date Folder": { "main": [[{ "node": "Log to Google Sheet", "type": "main", "index": 0 }]] },
+    "Log to Google Sheet": {
+      "main": [
+        [
+          { "node": "Upload Receipt to Drive", "type": "main", "index": 0 },
+          { "node": "Send Confirmation (optional)", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

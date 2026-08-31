@@ -1,0 +1,138 @@
+{
+  "name": "SUB - Get or Create Drive Folder",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "parentFolderId" },
+            { "name": "folderName" }
+          ]
+        }
+      },
+      "id": "75712007-c6e1-461f-bb2f-061b478c95b7",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [1088, 736]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.folderName }}",
+        "limit": 1,
+        "filter": {
+          "driveId": {
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.parentFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {
+          "fields": ["id", "name"]
+        }
+      },
+      "id": "a87768e4-7ad4-4b6a-8412-1cd0297500bd",
+      "name": "Search For Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1312, 736],
+      "notes": "Scoped by both folderName (query) AND parentFolderId (filter, By ID mode) so it never matches a same-named folder elsewhere in Drive. Limit is 1 since we only ever expect zero or one match."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "exists" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "72e2d433-3840-4553-a295-2a4d13389c23",
+      "name": "Folder Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1536, 736]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "folderId", "type": "string", "value": "={{ $json.id }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ce7b6657-afd1-4b43-b15c-c26fad937187",
+      "name": "Use Existing Folder Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1744, 624]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('When Called').item.json.folderName }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": {
+          "mode": "id",
+          "value": "={{ $('When Called').item.json.parentFolderId }}"
+        },
+        "options": {}
+      },
+      "id": "19ecb8f3-87f6-49a3-8b73-150aec199ca3",
+      "name": "Create Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1744, 832]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a2", "name": "folderId", "type": "string", "value": "={{ $json.id }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "457d688d-39b2-40e5-8d30-ea97d4e27063",
+      "name": "Use New Folder Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1968, 832]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": { "main": [[{ "node": "Search For Folder", "type": "main", "index": 0 }]] },
+    "Search For Folder": { "main": [[{ "node": "Folder Found?", "type": "main", "index": 0 }]] },
+    "Folder Found?": {
+      "main": [
+        [{ "node": "Use Existing Folder Id", "type": "main", "index": 0 }],
+        [{ "node": "Create Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Folder": { "main": [[{ "node": "Use New Folder Id", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
